@@ -3,7 +3,6 @@ import torch.utils.data as data
 import os
 import numpy as np
 from PIL import Image
-from pycocotools.coco import COCO
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 
@@ -58,6 +57,7 @@ class CocoDataset(data.Dataset):
 
 
 def get_coco_loader(root, json, transform, batch_size, shuffle, num_workers, categories):
+    from pycocotools.coco import COCO
     """Returns torch.utils.data.DataLoader for custom coco dataset."""
     # COCO caption dataset
     coco = CocoDataset(root=root,
@@ -84,30 +84,35 @@ def toGray(img):
     result[:,:, 2] = gray
 
     result = np.concatenate([img, result], 1)
-    return result
+    toTensor = transforms.ToTensor()
+    return {'A': toTensor(img), 'B': toTensor(result/255)}
 
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import skimage.io as io
 
-    image_dir = 'z:/Dataset/coco/val/orig/val2017/'
-    ann_file = 'z:/Dataset/coco/annotations/instances_val2017.json'
+    image_dir = 'z:/Dataset/coco/val/orig/'
+    # ann_file = 'z:/Dataset/coco/annotations/instances_val2017.json'
 
 
     tf = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(256),
         transforms.Lambda(toGray),
-        transforms.ToTensor(),
+        # transforms.ToTensor(),
     ])
 
-    dataloader = get_coco_loader(root = image_dir, json=ann_file, batch_size=4, shuffle=True, num_workers=1, transform=tf, categories=['truck'])
-
-    for i_batch, sample_batched in enumerate(dataloader):
-        print(i_batch, sample_batched.size())
-        plt.imshow(sample_batched[0])
+    # dataloader = get_coco_loader(root = image_dir, json=ann_file, batch_size=4, shuffle=True, num_workers=1, transform=tf, categories=['truck'])
+    dataloader = get_folder_loader(dataroot=image_dir, transform=tf, batch_size=4, shuffle=True, num_workers=1)
+    for i_batch, (data, labels) in enumerate(dataloader):
+        A = data['A']
+        B = data['B']
+        print(i_batch, A.size())
+        plt.imshow(A[0].numpy().transpose(1, 2, 0))
+        plt.imshow(B[0].numpy().transpose(1, 2, 0))
         plt.show()
-        io.imsave('../trash/img_{}.png'.format(i_batch), sample_batched[0] / 255)
+        io.imsave('trash/img_A_{}.png'.format(i_batch), A[0].numpy().transpose(1, 2, 0))
+        io.imsave('trash/img_B_{}.png'.format(i_batch), B[0].numpy().transpose(1, 2, 0))
         if i_batch > 4:
             break
