@@ -5,6 +5,9 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
+import torchvision.utils as vutils
+
+from imageutils import distort
 
 
 def get_folder_loader(dataroot, transform, batch_size, shuffle, num_workers):
@@ -76,6 +79,7 @@ def get_coco_loader(root, json, transform, batch_size, shuffle, num_workers, cat
                                               num_workers=num_workers)
     return data_loader
 
+
 def toGray(img):
     result = np.zeros((*img.size, 3))
     gray = img.convert("L")
@@ -83,9 +87,9 @@ def toGray(img):
     result[:,:, 1] = gray
     result[:,:, 2] = gray
 
-    result = np.concatenate([img, result], 1)
+    # result = np.concatenate([img, result], 1)
     toTensor = transforms.ToTensor()
-    return {'A': toTensor(img), 'B': toTensor(result/255)}
+    return {'A': toTensor(np.array(result/255, dtype=np.float32)), 'B': toTensor(img)}
 
 
 if __name__ == '__main__':
@@ -99,6 +103,7 @@ if __name__ == '__main__':
     tf = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(256),
+        # transforms.Lambda(distort),
         transforms.Lambda(toGray),
         # transforms.ToTensor(),
     ])
@@ -109,10 +114,16 @@ if __name__ == '__main__':
         A = data['A']
         B = data['B']
         print(i_batch, A.size())
-        plt.imshow(A[0].numpy().transpose(1, 2, 0))
-        plt.imshow(B[0].numpy().transpose(1, 2, 0))
+
+        # fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(20, 10))
+        # ax[0].imshow(A[0].numpy().transpose(1, 2, 0))
+        # ax[1].imshow(B[0].numpy().transpose(1, 2, 0))
+        # plt.savefig('trash/sample_{}.png'.format(i_batch))
+
+        C = torch.cat([B, A])
+        x = vutils.make_grid(C, nrow=4)
+        plt.imshow(np.transpose(x, (1, 2, 0)))
         plt.show()
-        io.imsave('trash/img_A_{}.png'.format(i_batch), A[0].numpy().transpose(1, 2, 0))
-        io.imsave('trash/img_B_{}.png'.format(i_batch), B[0].numpy().transpose(1, 2, 0))
+
         if i_batch > 4:
             break
