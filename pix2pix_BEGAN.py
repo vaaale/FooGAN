@@ -45,27 +45,23 @@ class BEGANModel():
     def __init__(self):
         self.kt = 0
         self.lamk = 0.001
+        self.lambdaImg = 0.1
 
         # Decide which device we want to run on
         self.device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
 
         self.netG = UnetGenerator(input_nc=3, output_nc=3, num_downs=7, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False)
-        self.netD = UnetDescriminator(input_nc=6, output_nc=6, num_downs=7, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False)
+        self.netD = UnetDescriminator(input_nc=3, output_nc=3, num_downs=7, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False)
         init_net(self.netG, 'normal', 0.002, [0])
         init_net(self.netD, 'normal', 0.002, [0])
 
-        import os
-        if os.path.isfile('checkpoints/netD' + socket.gethostname() + '.pth'):
-            print('Loading model....')
-            self.netG = torch.load('checkpoints/netG' + socket.gethostname() + '.pth')
-            self.netD = torch.load('checkpoints/netD' + socket.gethostname() + '.pth')
-
         self.netG.to(self.device)
         self.netD.to(self.device)
+        self.imagePool = ImagePool(pool_size)
 
 
     # criterionGAN = GANLoss(use_lsgan=not no_lsgan).to(device)
-    # criterionL1 = torch.nn.L1Loss()
+        self.criterionL1 = torch.nn.L1Loss()
 
     # initialize optimizers
         self.optimG = torch.optim.Adam(self.netG.parameters(), lr=lr, betas=(beta1, 0.999))
@@ -89,22 +85,37 @@ class BEGANModel():
     def forward(self):
         self.fake_B = self.netG(self.real_A)
 
-    def backward_G(self):
-        self.optimG.zero_grad()
-        self.xG = torch.cat([self.real_A, self.fake_B], 1)
-        self.d_fake = self.L_Df(self.xG)
-        self.d_fake.backward(retain_graph=True)
-        self.optimG.step()
-
     def backward_D(self):
         self.optimD.zero_grad()
-        self.xR = torch.cat([self.real_A, self.real_B], 1)
-        self.d_real = self.L_Df(self.xR)
+        fake = self.fake_B.detach()
+        fake = self.imagePool.query(fake)
+
+        self.recon_real = self.netD(self.real_B)
+        self.recon_fake = self.netD(fake)
+
+        # self.d_real = self.L_Df(self.xR)
+        self.d_real = torch.mean(torch.abs(self.recon_real - self.real_B))
+        self.d_fake = torch.mean(torch.abs(self.recon_fake - fake))
+
         self.L_D = self.d_real - self.kt * self.d_fake
         self.L_D.backward()
         self.optimD.step()
+
         self.L_D_val = self.L_D.item()
         self.L_G_val = self.d_fake.item()
+
+    def backward_G(self):
+        self.optimG.zero_grad()
+
+        L_Img = self.lambdaImg * self.criterionL1(self.fake_B, self.real_B)
+        L_Img.backward(retain_graph=True)
+
+        with torch.no_grad():
+            self.recon_fake = self.netD(self.fake_B)
+        self.d_fake = torch.mean(torch.abs(self.recon_fake - self.fake_B))
+        self.d_fake.backward()
+
+        self.optimG.step()
 
     def update_K(self):
         self.kt = self.kt + self.lamk * (opt.gamma * self.L_D_val - self.L_G_val)
