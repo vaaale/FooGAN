@@ -5,6 +5,10 @@ __pycache__/
 checkpoints
 logs
 results
+colorize
+checkpoints
+runs
+runs*
 *$py.class
 *.so
 .Python

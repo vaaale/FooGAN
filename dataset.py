@@ -6,8 +6,8 @@ from PIL import Image
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 import torchvision.utils as vutils
-
-from imageutils import distort
+import numpy as np
+from imageutils import distort, toGray
 
 
 def get_folder_loader(dataroot, transform, batch_size, shuffle, num_workers):
@@ -80,50 +80,52 @@ def get_coco_loader(root, json, transform, batch_size, shuffle, num_workers, cat
     return data_loader
 
 
-def toGray(img):
-    result = np.zeros((*img.size, 3))
-    gray = img.convert("L")
-    result[:,:, 0] = gray
-    result[:,:, 1] = gray
-    result[:,:, 2] = gray
-
-    # result = np.concatenate([img, result], 1)
-    toTensor = transforms.ToTensor()
-    return {'A': toTensor(np.array(result/255, dtype=np.float32)), 'B': toTensor(img)}
-
-
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import skimage.io as io
 
-    image_dir = 'z:/Dataset/coco/val/orig/'
-    # ann_file = 'z:/Dataset/coco/annotations/instances_val2017.json'
+    # image_dir = 'C:/Users/alex/Dataset/CelebA'
+    # output_dir = 'C:/Users/alex/Dataset/CelebA_combined/'
 
+    image_dir = 'Y:/Dataset/B'
+    output_dir = 'Y:/Dataset/AB_Gray'
+    # ann_file = 'z:/Dataset/coco/annotations/instances_val2017.json'
 
     tf = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(256),
-        # transforms.Lambda(distort),
-        transforms.Lambda(toGray),
-        # transforms.ToTensor(),
+        transforms.Lambda(distort),
     ])
 
-    # dataloader = get_coco_loader(root = image_dir, json=ann_file, batch_size=4, shuffle=True, num_workers=1, transform=tf, categories=['truck'])
-    dataloader = get_folder_loader(dataroot=image_dir, transform=tf, batch_size=4, shuffle=True, num_workers=1)
+    counter = 1
+    dataloader = get_folder_loader(dataroot=image_dir, transform=tf, batch_size=4, shuffle=False, num_workers=1)
+    nb_images = len(dataloader)
+    train_split = int(nb_images*0.8)
     for i_batch, (data, labels) in enumerate(dataloader):
         A = data['A']
         B = data['B']
-        print(i_batch, A.size())
 
         # fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(20, 10))
         # ax[0].imshow(A[0].numpy().transpose(1, 2, 0))
         # ax[1].imshow(B[0].numpy().transpose(1, 2, 0))
         # plt.savefig('trash/sample_{}.png'.format(i_batch))
+        # plt.show()
 
-        C = torch.cat([B, A])
-        x = vutils.make_grid(C, nrow=4)
-        plt.imshow(np.transpose(x, (1, 2, 0)))
-        plt.show()
+        # C = torch.cat([B, A])
+        # x = vutils.make_grid(C, nrow=4)
+        # plt.imshow(np.transpose(x, (1, 2, 0)))
 
         if i_batch > 4:
+            break
+
+        AB_batch = np.concatenate([A, B], 3)
+        for i in range(len(AB_batch)):
+            im_AB = (AB_batch[i].transpose([1, 2, 0])*255).astype(np.uint8)
+            np.clip(im_AB, 0, 255, im_AB)
+            path_AB = output_dir + '/{}/{}.png'.format('val' if counter > train_split else 'train', counter)
+            io.imsave(path_AB, im_AB)
+            plt.imshow(im_AB)
+            plt.show()
+            counter += 1
+        if counter > nb_images:
             break

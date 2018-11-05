@@ -56,9 +56,11 @@ class UnetSkipConnectionBlock(nn.Module):
             input_nc = outer_nc
         downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=4,
                              stride=2, padding=1, bias=use_bias)
-        downrelu = nn.LeakyReLU(0.2, True)
+        # downrelu = nn.LeakyReLU(0.2, True)
+        downrelu = nn.ELU(inplace=True)
         downnorm = norm_layer(inner_nc)
-        uprelu = nn.ReLU(True)
+        # uprelu = nn.ReLU(True)
+        uprelu = nn.ELU(inplace=True)
         upnorm = norm_layer(outer_nc)
 
         if outermost:
@@ -141,17 +143,14 @@ class UnetDescriminator(nn.Module):
 
 
 def conv_block(in_dim,out_dim):
-  return nn.Sequential(nn.Conv2d(in_dim,in_dim,kernel_size=3,stride=1,padding=1),
-                       nn.ELU(True),
-                       nn.Conv2d(in_dim,in_dim,kernel_size=3,stride=1,padding=1),
-                       nn.ELU(True),
-                       nn.Conv2d(in_dim,out_dim,kernel_size=1,stride=1,padding=0),
-                       nn.AvgPool2d(kernel_size=2,stride=2))
+  return nn.Sequential(nn.Conv2d(in_dim,in_dim,kernel_size=3,stride=1,padding=1), nn.ELU(True),
+                       nn.Conv2d(in_dim,in_dim,kernel_size=3,stride=1,padding=1), nn.ELU(True),
+                       nn.Conv2d(in_dim,out_dim,kernel_size=1,stride=1,padding=0), nn.AvgPool2d(kernel_size=2,stride=2))
+
+
 def deconv_block(in_dim,out_dim):
-  return nn.Sequential(nn.Conv2d(in_dim,out_dim,kernel_size=3,stride=1,padding=1),
-                       nn.ELU(True),
-                       nn.Conv2d(out_dim,out_dim,kernel_size=3,stride=1,padding=1),
-                       nn.ELU(True),
+  return nn.Sequential(nn.Conv2d(in_dim,out_dim,kernel_size=3,stride=1,padding=1), nn.ELU(True),
+                       nn.Conv2d(out_dim,out_dim,kernel_size=3,stride=1,padding=1), nn.ELU(True),
                        nn.UpsamplingNearest2d(scale_factor=2))
 
 
@@ -160,8 +159,7 @@ class Descriminator(nn.Module):
     super(Descriminator, self).__init__()
 
     # 256
-    self.conv1 = nn.Sequential(nn.Conv2d(nc,ndf,kernel_size=3,stride=1,padding=1),
-                               nn.ELU(True))
+    self.conv1 = nn.Sequential(nn.Conv2d(nc,ndf,kernel_size=3,stride=1,padding=1), nn.ELU(True))
     # 256
     self.conv2 = conv_block(ndf,ndf)
     # 128
@@ -178,12 +176,9 @@ class Descriminator(nn.Module):
     # 128
     self.deconv2 = deconv_block(ndf, ndf)
     # 256
-    self.deconv1 = nn.Sequential(nn.Conv2d(ndf,ndf,kernel_size=3,stride=1,padding=1),
-                                 nn.ELU(True),
-                                 nn.Conv2d(ndf,ndf,kernel_size=3,stride=1,padding=1),
-                                 nn.ELU(True),
-                                 nn.Conv2d(ndf, nc, kernel_size=3, stride=1, padding=1),
-                                 nn.Tanh())
+    self.deconv1 = nn.Sequential(nn.Conv2d(ndf,ndf,kernel_size=3,stride=1,padding=1), nn.ELU(True),
+                                 nn.Conv2d(ndf,ndf,kernel_size=3,stride=1,padding=1), nn.ELU(True),
+                                 nn.Conv2d(ndf, nc, kernel_size=3, stride=1, padding=1), nn.Tanh())
     """
     self.deconv1 = nn.Sequential(nn.Conv2d(ndf,nc,kernel_size=3,stride=1,padding=1),
                                  nn.Tanh())

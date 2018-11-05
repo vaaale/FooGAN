@@ -31,13 +31,14 @@ def gauss(image):
     row, col, ch = image.shape
     mean = 0
     var = 0.2
-    sigma = var ** 0.9
+    # sigma = var ** 0.9
+    sigma = 0.05
     #     gauss = np.random.normal(mean,sigma,(row,col,ch))
     #     noisy = image + gauss
     gauss = np.zeros_like(image)
     gauss[:, :, 0] = np.random.normal(mean, sigma, (row, col))
     gauss[:, :, 1] = np.random.normal(mean, sigma, (row, col))
-    #     gauss[:,:,2] = np.random.normal(mean,sigma,(row,col))
+    gauss[:, :, 2] = np.random.normal(mean, sigma, (row, col))
     noisy = image + gauss
     np.clip(noisy, 0, 1)
     return noisy
@@ -49,8 +50,26 @@ def rgb2gray(rgb):
     return gray
 
 
+def toGray(img):
+    result = np.zeros((*img.size, 3))
+    gray = img.convert("L")
+    result[:,:, 0] = gray
+    result[:,:, 1] = gray
+    result[:,:, 2] = gray
+
+    # result = np.concatenate([img, result], 1)
+    toTensor = transforms.ToTensor()
+    return {'A': toTensor(np.array(result/255, dtype=np.float32)), 'B': toTensor(img)}
+
+
+def todict(img):
+    # toTensor = transforms.ToTensor()
+    return {'A': img}
+
+
 def distort(img):
-    _img = blur(gauss(np.array(img) / 255.), kernel=2)
+    # _img = blur(gauss(np.array(img) / 255.), kernel=2)
+    _img = gauss(np.array(img) / 255.)
     result = np.zeros(_img.shape)
     gray = rgb2gray(_img)
     result[:,:, 0] = gray
@@ -59,6 +78,10 @@ def distort(img):
 
     # result = np.concatenate([img, result], 1)
     toTensor = transforms.ToTensor()
-    return {'A': toTensor(np.array(result, dtype=np.float32)), 'B': toTensor(img)}
+    # normA = transforms.Normalize(mean=[0.52646667, 0.52646667, 0.52646667], std=[0.21443187, 0.21443187, 0.21443187])
+    # normB = transforms.Normalize(mean=[0.5854925, 0.5845946, 0.5835283], std=[0.28469142, 0.28471425, 0.28451768])
+    normA = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    normB = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    return {'A': normA(toTensor(np.array(result, dtype=np.float32))), 'B': normB(toTensor(img))}
 
 

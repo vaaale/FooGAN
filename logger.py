@@ -2,6 +2,7 @@
 import tensorflow as tf
 import numpy as np
 import scipy.misc
+from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 try:
     from StringIO import StringIO  # Python 2.7
@@ -12,8 +13,25 @@ except ImportError:
 class Logger(object):
 
     def __init__(self, log_dir):
+        self.log_dir = log_dir
         """Create a summary writer logging to log_dir."""
         self.writer = tf.summary.FileWriter(log_dir)
+
+    def get_latest(self, tag, default):
+        tf_size_guidance = {
+            'compressedHistograms': 10,
+            'images': 0,
+            'scalars': 100,
+            'histograms': 1
+        }
+        event_acc = EventAccumulator(self.log_dir, tf_size_guidance)
+        event_acc.Reload()
+        tags = event_acc.Tags()['scalars']
+        if len(tags) > 0:
+            w_times, step_nums, vals = zip(*event_acc.Scalars(tag))
+            return (step_nums[-1], vals[-1])
+        else:
+            return (0, default)
 
     def scalar_summary(self, tag, value, step):
         """Log a scalar variable."""
